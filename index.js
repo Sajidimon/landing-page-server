@@ -1,6 +1,7 @@
 const express = require('express')
 const app = express();
 const cors = require('cors')
+const jwt = require('jsonwebtoken')
 const { MongoClient, ServerApiVersion, ObjectId } = require('mongodb');
 require('dotenv').config()
 const port = process.env.PORT || 5000;
@@ -11,6 +12,29 @@ app.use(cors());
 app.use(express.json());
 
 
+//validate token;
+
+const verifyJWT = (req, res, next) => {
+    const authorization = req.headers.authorization;
+    if (!authorization) {
+        return res.status(401).send({ error: true, message: 'unauthorized access' })
+    }
+
+    // token;
+
+    const token = authorization.split(' ')[1]
+
+    //verify token;
+
+    jwt.verify(token, process.env.ACCESS_TOKEN_SECRET, (err, decoded) => {
+        if (err) {
+            return res.status(401).send({error: true, message: 'unauthorized access'})
+        }
+        req.decoded = decoded
+        next();
+    })
+   
+}
 
 const uri = `mongodb+srv://${process.env.DB_USER}:${process.env.DB_PASSWORD}@cluster0.dcocwar.mongodb.net/?retryWrites=true&w=majority&appName=Cluster0`;
 
@@ -35,6 +59,15 @@ async function run() {
         const landingCollection = client.db('LandingPageDB').collection('landing')
 
 
+        // jwt token creation;
+
+        app.post('/jwt', async (req, res) => {
+            const user = req.body;
+            const token = jwt.sign(user, process.env.ACCESS_TOKEN_SECRET, { expiresIn: '1h' })
+            res.send({ token })
+        })
+
+        //
 
         //USER COLLECTION;
 
@@ -80,7 +113,7 @@ async function run() {
 
         app.get('/users/:email', async (req, res) => {
             const email = req.params.email;
-            const query = {email: email };
+            const query = { email: email };
             const result = await userCollection.findOne(query)
             res.send(result)
         })
@@ -100,8 +133,14 @@ async function run() {
 
         //get product from db;
 
-        app.get('/products', async (req, res) => {
+        app.get('/products', verifyJWT, async (req, res) => {
+            const decodedemail = req.decoded.email;
             const email = req.query.email;
+            if (email !== decodedemail) {
+                return res
+                    .status(403)
+                    .send({ error: true, message: 'forbidden access' })
+            }
             const query = { email: email }
             const result = await productCollection.find(query).toArray();
             res.send(result)
