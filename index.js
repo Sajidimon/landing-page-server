@@ -255,7 +255,7 @@ async function run() {
         })
 
 
-        // get product by title from db to view only;
+        // get product by id from db to view only;
 
         app.get('/landing/product/:id', async (req, res) => {
             const id = req.params.id;
